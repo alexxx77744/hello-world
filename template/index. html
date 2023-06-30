@@ -1,1 +1,15 @@
+html
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Web Parser</title>
+  </head>
+  <body>
+    <h1>Web Parser</h1>
+    <form action="/parse" method="post">
+      <input type="text" name="url" placeholder="Enter URL">
+      <input type="submit" value="Parse">
+    </form>
+  </body>
+</html>
 
