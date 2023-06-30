@@ -1,1 +1,25 @@
+html
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Parse Results</title>
+  </head>
+  <body>
+    <h1>Parse Results</h1>
+    <table>
+      <tr>
+        <th>Column 1</th>
+        <th>Column 2</th>
+        <th>Column 3</th>
+      </tr>
+      {% for item in data %}
+      <tr>
+        <td>{{ item.column1 }}</td>
+        <td>{{ item.column2 }}</td>
+        <td>{{ item.column3 }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </body>
+</html>
 
