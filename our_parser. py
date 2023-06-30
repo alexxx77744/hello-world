@@ -1,1 +1,114 @@
 
+import requests
+import pandas as pd
+import schedule
+import time
+
+def compare_crypto_prices():
+    # Параметры для API Binance
+    binance_url = "https://api.binance.com/api/v3/ticker/price"
+
+    # Параметры для API KuCoin
+    kucoin_url = "https://api.kucoin.com/api/v1/market/allTickers"
+
+    # Список символов для исключения        
+    blacklist_symbols = ['FILDOWNUSDT', 'FILUPUSDT', 'BTCUPUSDT', 'BTCDOWNUSDT', 'SXPUPUSDT', 'SXPDOWNUSDT', 'ETHUPUSDT', 'ETHDOWNUSDT']
+
+    try:
+        # Получаем данные с Binance
+        binance_response = requests.get(binance_url)
+        binance_response.raise_for_status()
+        binance_data = binance_response.json()
+
+        # Получаем данные с KuCoin
+        kucoin_response = requests.get(kucoin_url)
+        kucoin_response.raise_for_status()
+        kucoin_data = kucoin_response.json()
+
+        price_differences = []
+        blacklist_differences = []
+        for item in binance_data:
+            if item["symbol"].endswith("USDT") and not item["symbol"].startswith("FUTURES"):
+                binance_symbol = item["symbol"]
+                binance_price = float(item["price"])
+
+                # Проверяем, присутствует ли символ в черном списке
+                if binance_symbol in blacklist_symbols:
+                    for kucoin_item in kucoin_data["data"]["ticker"]:
+                        if kucoin_item["symbol"] == binance_symbol.replace("USDT", "-USDT"):
+                            kucoin_price = float(kucoin_item["last"])
+                            difference = ((kucoin_price - binance_price) / binance_price) * 100
+                            blacklist_differences.append((binance_symbol, difference))
+                            break
+                else:
+                    kucoin_symbol = binance_symbol.replace("USDT", "-USDT")
+                    kucoin_price = None
+                    for kucoin_item in kucoin_data["data"]["ticker"]:
+                        if kucoin_item["symbol"] == kucoin_symbol:
+                            kucoin_price = float(kucoin_item["last"])
+                            break
+
+                    if kucoin_price:
+                        difference = ((kucoin_price - binance_price) / binance_price) * 100
+                        if abs(difference) > 1:
+                            price_differences.append((binance_symbol, difference))
+
+        price_differences.sort(key=lambda x: x[1])
+        blacklist_differences.sort(key=lambda x: x[1])
+
+        print("---- Результат ----")
+        print("Цены без черного списка:")
+        for symbol, difference in price_differences:
+            if difference > 0:
+                print(f"Купить {symbol} на Binance, продать на KuCoin. Прибыль: {difference:.2f}%")
+            else:
+                print(f"Купить {symbol} на KuCoin, продать на Binance. Прибыль: {-difference:.2f}%")
+
+        print("\nЦены в черном списке:")
+        for symbol, difference in blacklist_differences:
+            if difference > 0:
+                print(f"Купить {symbol} на Binance, продать на KuCoin. Прибыль: {difference:.2f}%")
+            else:
+                print(f"Купить {symbol} на KuCoin, продать на Binance. Прибыль: {-difference:.2f}%")
+        visualize_differences(price_differences)
+        visualize_blacklist_differences(blacklist_differences)
+
+    except requests.exceptions.HTTPError as e:
+        print(f"Ошибка при получении данных: {e}")
+
+def visualize_differences(price_differences):
+    data = {'Символы': [], 'Разница в процентах': [], 'Рекомендация': []}
+    for symbol, difference in price_differences:
+        data['Символы'].append(symbol)
+        data['Разница в процентах'].append(difference)
+        if difference > 0:
+            data['Рекомендация'].append(f"Купить {symbol} на Binance, продать на KuCoin.")
+        else:
+            data['Рекомендация'].append(f"Купить {symbol} на KuCoin, продать на Binance.")
+
+    df = pd.DataFrame(data)
+    print(df)
+
+def visualize_blacklist_differences(blacklist_differences):
+    data = {'Символы (Черный список)': [], 'Разница в процентах (Черный список)': [], 'Рекомендация (Черный список)': []}
+    for symbol, difference in blacklist_differences:
+        data['Символы (Черный список)'].append(symbol)
+        data['Разница в процентах (Черный список)'].append(difference)
+        if difference > 0:
+            data['Рекомендация (Черный список)'].append(f"Купить {symbol} на Binance, продать на KuCoin.")
+        else:
+            data['Рекомендация (Черный список)'].append(f"Купить {symbol} на KuCoin, продать на Binance.")
+
+    df_blacklist = pd.DataFrame(data)
+    print(df_blacklist)
+
+# Сначала запускаем парсер для первого обновления
+compare_crypto_prices()
+
+# Планируем выполнение функции compare_crypto_prices каждые 5 минут
+schedule.every(5).minutes.do(compare_crypto_prices)
+
+while True:
+    schedule.run_pending()
+    time.sleep(1)
+
